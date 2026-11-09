@@ -164,8 +164,9 @@ body[data-theme=classic][data-tab=book] #results .result-icon{background:linear-
 body[data-theme=classic][data-tab=book] #results .result-icon.added{background:linear-gradient(#36d47c,#14954a);box-shadow:inset 0 1px 0 #fff4,0 3px 0 #0a5a2b}
 body[data-theme=classic][data-tab=book] #more{width:calc(100% + 32px);margin:0 -16px;padding:12px 16px 14px;border:0;border-radius:0;background:#fffaf0;color:#1d1b16;font:700 13px 'IBM Plex Sans KR',sans-serif}
 body[data-theme=classic][data-tab=book] #results:not(:empty)::before{margin:0}
-body[data-theme=classic][data-tab=book] #results .result{padding-right:88px}
+body[data-theme=classic][data-tab=book] #results .result{padding-right:58px}
 body[data-theme=classic][data-tab=book] #results .result-preview{color:#8a1421}
+body[data-theme=classic][data-tab=book] #results .result-preview svg path{fill:#fffaf0}
 body[data-theme=classic][data-tab=book] #results .result .tag{background:#14954a;color:#fff}
 body[data-theme=classic][data-tab=book] .searchbar{margin:14px 0 10px}
 body[data-theme=classic][data-tab=book] .empty{justify-items:start;margin:0;padding:18px 16px;border:0;border-bottom:1px solid #d9cfb4;border-radius:0;background:none;box-shadow:none;color:#6b6556;text-align:left}

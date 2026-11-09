@@ -311,7 +311,8 @@ function showResult(song,list=$('results'),wrap=row=>row,index=-1){
   catch(error){icon(status,'failed');mark('failed',"Couldn't add. Try again");toast(error.message,undefined,'err');}finally{b.disabled=false;}
  };
  if(list===$('results')){
-  const row=el('div',undefined,'result-entry'),preview=el('a','YouTube','result-preview');
+  const row=el('div',undefined,'result-entry'),preview=el('a',undefined,'result-preview');
+  preview.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 8.5v7l6-3.5z"/></svg>';
   preview.href=`https://www.youtube.com/watch?v=${encodeURIComponent(song.id)}`;preview.target='_blank';preview.rel='noopener noreferrer';preview.setAttribute('aria-label',`Preview ${song.title} on YouTube (opens a new tab)`);
   row.append(b,preview);list.append(row);
  }else list.append(wrap(b));
