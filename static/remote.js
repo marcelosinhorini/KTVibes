@@ -310,7 +310,11 @@ function showResult(song,list=$('results'),wrap=row=>row,index=-1){
   try{await enqueue({id:song.id,...song.parsed});icon(status,'added');mark('added',el('em','예약됨'),' · added');haptic([10,40,10]);flyToQueue(image);toast(`Added ${song.parsed.title}`);}
   catch(error){icon(status,'failed');mark('failed',"Couldn't add. Try again");toast(error.message,undefined,'err');}finally{b.disabled=false;}
  };
- list.append(wrap(b));
+ if(list===$('results')){
+  const row=el('div',undefined,'result-entry'),preview=el('a','YouTube','result-preview');
+  preview.href=`https://www.youtube.com/watch?v=${encodeURIComponent(song.id)}`;preview.target='_blank';preview.rel='noopener noreferrer';preview.setAttribute('aria-label',`Preview ${song.title} on YouTube (opens a new tab)`);
+  row.append(b,preview);list.append(row);
+ }else list.append(wrap(b));
 }
 // The thumbnail arcs into whichever queue count is on screen: the outer box moves across evenly,
 // the inner one up or down with an overshooting ease, which together trace a curve.
