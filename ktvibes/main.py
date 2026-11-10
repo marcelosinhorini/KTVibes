@@ -128,6 +128,11 @@ async def songbook_list():
     """Prepared songs by songbook number, for the remote's keypad and songbook (with when each was prepared, for 신곡)."""
     return sorted((s for s in prepared_songs().values() if s.get("number")), key=lambda s: s["number"])
 
+@app.get("/api/library")
+async def library_list():
+    """Every prepared song, including older entries without a songbook number."""
+    return list(prepared_songs().values())
+
 @app.get("/api/ambient")
 async def ambient():
     """Cached music videos the TV loops, muted, behind an empty stage: only songs that were prepared,

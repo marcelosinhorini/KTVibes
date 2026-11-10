@@ -94,6 +94,11 @@ class APITests(unittest.TestCase):
         self.assertEqual([(s['number'], s['id']) for s in songs], [(10001, 'bbbbbbbbbbb'), (10002, 'aaaaaaaaaaa')])
         self.assertIsInstance(songs[0]['prepared'], float)
 
+        # The library includes every prepared entry, not only numbered or played songs.
+        library = self.client.get('/api/library').json()
+        self.assertEqual({s['id'] for s in library}, {'aaaaaaaaaaa', 'bbbbbbbbbbb', 'ccccccccccc'})
+        self.assertIsNone(next(s for s in library if s['id'] == 'ccccccccccc')['number'])
+
     def test_delete_song_removes_download_and_history(self):
         import json
         cache = Path(self.temp.name)
@@ -108,6 +113,7 @@ class APITests(unittest.TestCase):
         self.assertFalse(folder.exists())
         self.assertEqual(self.main.state.played, {})
         self.assertEqual(self.client.get('/api/recent').json(), [])
+        self.assertEqual(self.client.get('/api/library').json(), [])
         self.assertEqual(self.client.delete('/api/songs/aaaaaaaaaaa').status_code, 404)
         self.assertEqual(self.client.delete('/api/songs/..%2F..%2Fetc').status_code, 404)
 
