@@ -64,6 +64,8 @@ uv run ktvibes
 
 Plan for about 8 GB of disk: the install itself is 6.5 GB (mostly PyTorch with CUDA), and the first song downloads the separation model (80 MB) and the alignment model (1.2 GB). On a clean Ubuntu 24.04 machine the installer took under 5 minutes.
 
+Korean pronunciation also needs the NLTK CMU dictionary. If the log reports it missing, install it explicitly from the KTVibes folder with `uv run python -m nltk.downloader cmudict` and restart. The Korean guide uses the installed `python-mecab-ko` on Windows too; it does not install packages at runtime. If a guide fails, word timing and other guides remain available, and the failed guide is retried after restart.
+
 ## Use
 
 1. Run `ktvibes`.

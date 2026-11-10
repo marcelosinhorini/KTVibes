@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import hashlib
 import json
 import logging
@@ -55,7 +56,7 @@ def timed_lyrics(folder: Path, raw: str, samples_path: Path, lines: list[dict]) 
     try:
         cached = json.loads((folder / "timed.json").read_text(encoding="utf-8"))
         # Energy-only timing (the aligner failed) is retried once per run, not on every play.
-        if cached.get("key") == key and (cached.get("aligned", True) or (folder / "timed.json").stat().st_mtime >= STARTED):
+        if cached.get("key") == key and ((cached.get("aligned", True) and not cached.get("failed_guides")) or (folder / "timed.json").stat().st_mtime >= STARTED):
             return cached["lines"]
     except (OSError, ValueError, KeyError):
         pass
@@ -74,9 +75,16 @@ def timed_lyrics(folder: Path, raw: str, samples_path: Path, lines: list[dict]) 
         log.exception("Forced alignment unavailable for %s", folder.name)
         aligned = False
     lyrics.time_units(lines, energy)
-    lines = lyrics.add_jyutping(guides.add_hangul(lyrics.add_korean_romanization(lyrics.add_pinyin(lyrics.add_romaji(lines)))))
+    failed_guides = []
+    for guide in (lyrics.add_romaji, lyrics.add_pinyin, lyrics.add_korean_romanization, guides.add_hangul, lyrics.add_jyutping):
+        try:
+            # A guide can mutate some lines before failing; retain only complete output.
+            lines = guide(copy.deepcopy(lines))
+        except Exception:
+            failed_guides.append(guide.__name__)
+            log.exception("Pronunciation guide %s unavailable for %s; will retry after restart", guide.__name__, folder.name)
     temporary = folder / "timed.tmp"
-    temporary.write_text(json.dumps({"key": key, "aligned": aligned, "lines": lines}, ensure_ascii=False), encoding="utf-8")
+    temporary.write_text(json.dumps({"key": key, "aligned": aligned, "failed_guides": failed_guides, "lines": lines}, ensure_ascii=False), encoding="utf-8")
     temporary.replace(folder / "timed.json")
     return lines
 
