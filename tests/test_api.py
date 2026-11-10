@@ -50,6 +50,8 @@ class APITests(unittest.TestCase):
         folder = Path(self.temp.name) / 'aaaaaaaaaaa'
         folder.mkdir()
         (folder / 'meta.json').write_text(json.dumps({'artist': 'Simple Plan', 'title': 'Perfect', 'duration': 280}), encoding='utf-8')
+        (folder / 'no_vocals.wav').touch()
+        (folder / 'vocals.wav').touch()
         record = {'id': 7, 'trackName': 'Perfect', 'artistName': 'Simple Plan', 'duration': 278, 'syncedLyrics': '[00:10.00]Hey dad look at me'}
         async def search(query, duration):
             self.assertEqual(query, 'simple plan perfect')
@@ -63,6 +65,8 @@ class APITests(unittest.TestCase):
             self.assertEqual(self.client.post('/api/songs/aaaaaaaaaaa/lyrics', json={'id': 7}).status_code, 200)
         self.assertEqual((folder / 'lyrics.lrc').read_text(encoding='utf-8'), record['syncedLyrics'])
         self.assertEqual(json.loads((folder / 'meta.json').read_text(encoding='utf-8'))['lyrics_identity'], ['Simple Plan', 'Perfect'])
+        self.assertEqual(self.client.get('/api/library').json()[0]['lyrics_status'], 'available')
+        self.assertEqual(self.main.state.lyrics_catalog_rev, 1)
 
     def test_recent_lists_played_songs_newest_first(self):
         import json
@@ -79,6 +83,27 @@ class APITests(unittest.TestCase):
         songs = self.client.get('/api/recent').json()
         self.assertEqual([s['id'] for s in songs], ['bbbbbbbbbbb', 'aaaaaaaaaaa'])
         self.assertEqual(songs[0]['artist'], '아이유')
+
+    def test_lyrics_availability_in_prepared_lists_and_search(self):
+        import json
+        cache = Path(self.temp.name)
+        for video_id, status in [('aaaaaaaaaaa', 'missing'), ('bbbbbbbbbbb', 'available'), ('ccccccccccc', 'unknown')]:
+            folder = cache / video_id
+            folder.mkdir()
+            meta = {'artist': 'Artist', 'title': video_id, 'number': 10001 + len(list(cache.glob('*/meta.json')))}
+            if status != 'unknown':
+                meta.update(lyrics_identity=['Artist', video_id], lyrics_checked=1)
+            (folder / 'meta.json').write_text(json.dumps(meta), encoding='utf-8')
+            (folder / 'no_vocals.wav').touch()
+            (folder / 'vocals.wav').touch()
+            if status == 'available':
+                (folder / 'lyrics.lrc').write_text('[00:01.00]Hello', encoding='utf-8')
+            self.main.state.played[video_id] = 1
+        expected = {'aaaaaaaaaaa': 'missing', 'bbbbbbbbbbb': 'available', 'ccccccccccc': 'unknown'}
+        for endpoint in ('/api/library', '/api/recent', '/api/songbook'):
+            self.assertEqual({s['id']: s['lyrics_status'] for s in self.client.get(endpoint).json()}, expected)
+        with patch.object(self.main.youtube, 'search', return_value=[{'id': key} for key in expected]):
+            self.assertEqual({s['id']: s['lyrics_status'] for s in self.client.get('/api/search', params={'q': 'song'}).json()}, expected)
 
     def test_songbook_lists_numbered_prepared_songs_in_order(self):
         import json

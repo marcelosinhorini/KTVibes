@@ -1,5 +1,5 @@
 import {classicRemote,toastParts,emptyNote,secondsLeft} from './classic-remote.js';
-import {$,el,connect,api,clock,throttle,prepLabel,syncRanges,REDUCED,thumbnail} from './shared.js';
+import {$,el,connect,api,clock,throttle,prepLabel,syncRanges,REDUCED,thumbnail,lyricsBadge} from './shared.js';
 let state,classicUi;
 const SPRING='cubic-bezier(.38,1.21,.22,1)';
 const haptic=pattern=>{try{navigator.vibrate?.(pattern);}catch{}};
@@ -21,7 +21,7 @@ function render(next){
  $('connection').textContent=!state.player_connected?'Open /tv on a device':state.player_audio?'Device ready':'Tap Enable sound on the device';$('connection').classList.toggle('warn',!state.player_audio);$('connection').classList.toggle('off',!state.player_connected);
  document.body.dataset.theme=state.theme||'default';showNow(!before);showControls(before);showQueue(before);showClassic();classicUi?.render(state);
  const ready=[state.current,...state.upcoming].filter(i=>i?.status==='ready').map(i=>i.key).join();
- if(ready!==readyKeys){readyKeys=ready;loadRecent();classicUi?.loadBook();if($('library').open)loadLibrary();}
+  if(ready!==readyKeys||before?.lyrics_catalog_rev!==state.lyrics_catalog_rev){readyKeys=ready;recentShape=null;loadRecent();classicUi?.loadBook();if($('library').open)loadLibrary();if(before)refreshSearchLyrics();}
 }
 // Now playing: a card at the top, handing over to the dock once scrolled away.
 function showNow(first){
@@ -30,7 +30,7 @@ function showNow(first){
  for(const id of ['hero-play','dock-play']){$(id).classList.toggle('playing',!!(c&&state.playing));$(id).setAttribute('aria-label',state.playing?'Pause':'Play');$(id).disabled=!c;}
  // The card keeps its last song while it folds away.
  for(const id of c?['hero-art','hero-glow','dock-art','sheet-art']:['dock-art','sheet-art'])showImage($(id),art);
- if(c){$('hero-title').textContent=c.title;$('hero-artist').textContent=c.artist;}$('hero-length').textContent=$('length').textContent=clock(c?.duration);
+  if(c){$('hero-title').textContent=c.title;if(c.lyrics_status==='missing')$('hero-title').append(' ',lyricsBadge('missing'));$('hero-artist').textContent=c.artist;}$('hero-length').textContent=$('length').textContent=clock(c?.duration);
  $('dock-title').textContent=$('sheet-title').textContent=c?.title||'Nothing playing';$('dock-artist').textContent=c?.artist||'';
  showPosition();
 }
@@ -180,7 +180,7 @@ const statusKo=(item,index)=>index===0&&item.status==='ready'?'다음곡':STATUS
 function showQueue(before){
  const count=state.upcoming.length;$('queue-count').textContent=$('dock-count').textContent=count;
  if(before&&count>before.upcoming.length&&!REDUCED.matches)for(const id of ['queue-count','dock-count']){const c=$(id);c.classList.remove('bump');void c.offsetWidth;c.classList.add('bump');}
- const shape=JSON.stringify([!!state.current,...state.upcoming.map(i=>[i.key,i.title,i.artist,i.status,i.error])]);  // the empty notice reads differently while a song plays
+  const shape=JSON.stringify([!!state.current,...state.upcoming.map(i=>[i.key,i.title,i.artist,i.status,i.error,i.lyrics_status])]);  // the empty notice reads differently while a song plays
  if(shape!==queueShape&&!dragging){
   // A song that turns ready while queued flashes its ring once.
   const preparing=new Set(before?.upcoming.filter(i=>i.status!=='ready').map(i=>i.key));
@@ -218,7 +218,8 @@ function queueRow(item,index,justReady){
  // The ring shows while the song prepares, and once more as it turns ready.
  if(item.status!=='ready'&&item.status!=='error'||justReady&&item.status==='ready')thumb.insertAdjacentHTML('beforeend',`<svg class="ring" viewBox="0 0 52 52" style="--c:${RING}" aria-hidden="true"><circle class="track" cx="26" cy="26" r="23"/><circle class="fill" cx="26" cy="26" r="23"/></svg>`);
  if(justReady&&item.status==='ready')haptic(10);
- const info=el('div',undefined,'info'),line=el('p');if(item.number)line.append(el('span',String(item.number),'qnum classic-only'),' ');line.append(item.artist,...(justReady&&item.status==='ready'?[el('em','준비 완료','ready-lamp classic-only')]:[]),el('span',' · ','sep'),el('span',statusKo(item,index),'status-ko classic-only'),el('span',statusText(item),'status'));info.append(el('h3',item.title),line);
+  const info=el('div',undefined,'info'),line=el('p');if(item.number)line.append(el('span',String(item.number),'qnum classic-only'),' ');line.append(item.artist,...(justReady&&item.status==='ready'?[el('em','준비 완료','ready-lamp classic-only')]:[]),el('span',' · ','sep'),el('span',statusKo(item,index),'status-ko classic-only'),el('span',statusText(item),'status'));info.append(el('h3',item.title),line);
+  if(item.lyrics_status==='missing')line.append(' ',lyricsBadge(item.lyrics_status));
  if(item.status!=='ready'&&item.status!=='error'){const bar=el('div',undefined,'prepbar classic-only');bar.append(el('i'));info.append(bar);}
  if(item.error){const retry=el('button','Retry','retry');retry.onclick=()=>send({action:'retry',key:item.key});info.append(el('p',item.error,'error'),retry);}
  const remove=el('button','×','row-button');remove.setAttribute('aria-label',`Remove ${item.title}`);
@@ -320,8 +321,9 @@ const ICONS={add:'<path d="M12 5v14M5 12h14"/>',added:'<path d="M5 12.5l4.5 4.5L
 function icon(node,name){node.className=`result-icon ${name}`;node.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;}
 // One tap queues the song with the artist/title parsed from YouTube (or confirmed earlier, for recent songs).
 function showResult(song,list=$('results'),wrap=row=>row,index=-1){
- const b=el('button',undefined,index<0?'result':'result enter');if(index>=0)b.style.setProperty('--i',index);
- const image=el('img');image.src=song.thumbnail;image.alt='';const info=el('div');const title=el('strong',song.title);if(song.cached)title.append(el('span','READY','tag'));const note=el('small',undefined,'result-note classic-only');info.append(title,el('small',`${song.channel} · ${clock(song.duration)}`),note);const status=el('span');icon(status,'add');b.append(image,info,status);
+  const b=el('button',undefined,index<0?'result':'result enter');b.dataset.songId=song.id;if(index>=0)b.style.setProperty('--i',index);
+  const image=el('img');image.src=song.thumbnail;image.alt='';const info=el('div');const title=el('strong',song.title);if(song.cached)title.append(el('span','READY','tag'));const note=el('small',undefined,'result-note classic-only');info.append(title,el('small',`${song.channel} · ${clock(song.duration)}`),note);const status=el('span');icon(status,'add');b.append(image,info,status);
+  if(song.lyrics_status==='missing')title.append(lyricsBadge(song.lyrics_status));
  // Classic swaps the channel line for what happened to the add.
  const mark=(name,...text)=>{b.classList.remove('added','failed');b.classList.add(name);note.replaceChildren(...text);};
  b.onclick=async()=>{
@@ -337,6 +339,9 @@ function showResult(song,list=$('results'),wrap=row=>row,index=-1){
   preview.href=`https://www.youtube.com/watch?v=${encodeURIComponent(song.id)}`;preview.target='_blank';preview.rel='noopener noreferrer';preview.setAttribute('aria-label',`Preview ${song.title} on YouTube (opens a new tab)`);
   row.append(b,preview);list.append(row);
  }else list.append(wrap(b));
+}
+async function refreshSearchLyrics(){
+ try{const songs=await api('/api/library'),known=new Map(songs.map(s=>[s.id,s.lyrics_status]));for(const row of $('results').querySelectorAll('[data-song-id]')){const title=row.querySelector('strong');title.querySelector('.lyrics-badge')?.remove();if(known.get(row.dataset.songId)==='missing')title.append(lyricsBadge('missing'));}}catch{}
 }
 // The thumbnail arcs into whichever queue count is on screen: the outer box moves across evenly,
 // the inner one up or down with an overshooting ease, which together trace a curve.

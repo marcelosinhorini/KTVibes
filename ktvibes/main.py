@@ -86,7 +86,7 @@ async def search(q: str = Query(min_length=1, max_length=200), page: int = Query
         raise HTTPException(502, f"YouTube search failed: {youtube.explain(exc)}") from exc
     # Prepared songs start right away; the remote marks them.
     cached = prepared_songs()
-    return [{**result, "cached": result["id"] in cached} for result in results]
+    return [{**result, "cached": result["id"] in cached, "lyrics_status": cached.get(result["id"], {}).get("lyrics_status", "unknown")} for result in results]
 
 class Song(BaseModel):
     id: str = Field(pattern=r"^[A-Za-z0-9_-]{11}$")
@@ -113,7 +113,8 @@ def prepared_songs() -> dict:
         video_id = meta_path.parent.name
         if youtube.ID.fullmatch(video_id) and meta.get("artist") and meta.get("title") and stems.prepared(meta_path.parent):
             songs[video_id] = {"id": video_id, "artist": meta["artist"], "title": meta["title"], "duration": meta.get("duration"),
-                               "thumbnail": f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg", "prepared": prepared, "number": meta.get("number")}
+                               "thumbnail": f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg", "prepared": prepared, "number": meta.get("number"),
+                               "lyrics_status": worker.lyrics_status(meta_path.parent, meta)}
     return songs
 
 @app.get("/api/recent")
@@ -188,7 +189,7 @@ async def choose_lyrics(video_id: str, choice: LyricChoice):
         lines = await asyncio.to_thread(worker.timed_lyrics, folder, chosen["syncedLyrics"], stems.path(folder, "vocals"), lines)
         lyrics.line_starts(lines)
         if state.current and state.current["id"] == video_id:
-            state.current.update(lyrics=lines, lyrics_rev=state.current.get("lyrics_rev", 0) + 1)
+            state.current.update(lyrics=lines, lyrics_status="available", lyrics_rev=state.current.get("lyrics_rev", 0) + 1)
             state.offset = 0
             state.lyrics_sent.clear()
             await state.broadcast()
@@ -196,6 +197,15 @@ async def choose_lyrics(video_id: str, choice: LyricChoice):
     meta["lyrics_identity"] = [meta["artist"], meta["title"]]
     meta.pop("lyric_offset", None)  # a nudge for other lyrics no longer fits
     worker.save_meta(folder, meta)
+    for item in state.upcoming:
+        if item["id"] == video_id and item["status"] == "ready":
+            lines = lyrics.parse_lrc(chosen["syncedLyrics"])
+            lines = await asyncio.to_thread(worker.timed_lyrics, folder, chosen["syncedLyrics"], stems.path(folder, "vocals"), lines)
+            lyrics.line_starts(lines)
+            item["lyrics"] = lines
+            item["lyrics_status"] = "available"
+    state.lyrics_catalog_rev += 1
+    await state.broadcast()
     return {"saved": choice.id}
 
 @app.delete("/api/songs/{video_id}")
