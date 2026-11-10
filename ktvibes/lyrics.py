@@ -156,9 +156,24 @@ def romanize(syllables: str) -> list[str]:
 def add_korean_romanization(lines: list[dict]) -> list[dict]:
     """Romanize each Korean syllable from its sung pronunciation (눈물이 -> nun mu ri, 못하게 -> mo ta ge)."""
     global _g2p
+    if not any(line.get("units") and HANGUL.search(line["text"]) for line in lines):
+        return lines
     if _g2p is None:
+        # g2pk2 otherwise downloads this corpus at import and tries to install eunjeon
+        # on Windows. Use the already-declared python-mecab-ko on every platform.
+        import nltk
+        try:
+            nltk.data.find("corpora/cmudict.zip")
+        except LookupError as exc:
+            raise RuntimeError("Korean pronunciation needs the NLTK cmudict corpus; run uv run python -m nltk.downloader cmudict, then restart KTVibes") from exc
+        from mecab import MeCab
         from g2pk2 import G2p
-        _g2p = G2p()
+        class InstalledG2p(G2p):
+            def check_mecab(self):
+                pass
+            def get_mecab(self):
+                return MeCab()
+        _g2p = InstalledG2p()
     for line in lines:
         units = line.get("units")
         if not units or not HANGUL.search(line["text"]):
