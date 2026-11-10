@@ -61,6 +61,7 @@ class State:
         self.saved_at = 0.0
         self.build = ""  # fingerprint of the web app files; open pages reload when it changes
         self.lyrics_sent = {}  # TV socket -> key of the song whose lyrics it already has
+        self.lyrics_catalog_rev = 0  # refresh remote lists after a manual lyric selection
 
     def guides(self):
         """Guide modes with something to show for the current song (all of them when idle)."""
@@ -79,7 +80,7 @@ class State:
                 "offset": self.offset, "vocal": self.vocal, "music": self.music, "guide": self.guide, "guides": self.guides(), "lyric_scale": self.lyric_scale, "video_mode": self.video_mode, "lyric_mode": self.lyric_mode, "theme": self.theme, "room_ends": self.room_ends, "time_up": self.time_up(), "speed": self.speed, "key": self.key, "seek_id": self.seek_id, "position": self.position,
                 "transition_until": self.transition_until, "server_time": time.time(),
                 "player_connected": self.player is not None, "player_audio": self.player is not None and self.audio,
-                "revision": self.revision, "build": self.build}
+                "revision": self.revision, "build": self.build, "lyrics_catalog_rev": self.lyrics_catalog_rev}
 
     def restore(self, path: Path, seed=lambda: {}):
         """Reload the saved queue; songs are prepared again (fast from cache) and the current one resumes."""

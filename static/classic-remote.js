@@ -1,6 +1,6 @@
 // Classic theme on the remote: the room's handset and songbook, in four tabs.
 // The tabs reuse the remote's own sections (search, queue, settings); CSS shows the active tab's.
-import {$,el,api,clock,newSongs} from './shared.js';
+import {$,el,api,clock,newSongs,lyricsBadge} from './shared.js';
 const TABS=['handset','book','queue','settings'],TAB_KEY='ktvibes.tab';
 const MODES={handset:'곡번호 · DIAL',book:'노래책 · SONGBOOK',queue:'예약 · RESERVED',settings:'방 설정 · ROOM'};
 // In DSEG "!" is a blank digit, so lit digits line up over the ghost 88888.
@@ -85,7 +85,8 @@ export function classicRemote({send,toast,haptic,swipeable}){
  function bookRow(song){
   const b=el('button',undefined,'result book-row'),t=el('span',song.title,'t');t.append(el('span',song.artist,'a'));
   b.dataset.find=`${song.number} ${song.title} ${song.artist}`.toLowerCase();b.dataset.initial=initial(song.title);
-  b.append(el('b',String(song.number),'n'),t,el('span',clock(song.duration),'d'));
+   if(song.lyrics_status==='missing')t.append(lyricsBadge(song.lyrics_status));
+   b.append(el('b',String(song.number),'n'),t,el('span',clock(song.duration),'d'));
   b.onclick=()=>{if(b.dataset.dragged){delete b.dataset.dragged;return;}if(b.parentElement?.classList.contains('open'))return;haptic([10,40,10]);send({action:'reserve',number:song.number});toast(`${song.number} 예약 · ${song.title}`);};
   return swipeable(b,song);
  }

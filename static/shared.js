@@ -1,5 +1,6 @@
 export const $ = id => document.getElementById(id);
 export function el(tag, text, className) { const node=document.createElement(tag); if(text!==undefined)node.textContent=text; if(className)node.className=className; return node; }
+export function lyricsBadge(status){return status==='missing'?el('span','No lyrics','lyrics-badge'):null;}
 // A page left open across a KTVibes update reloads once to pick up the new files.
 let build;
 function reloadIfUpdated(next){if(!next)return false;if(build===undefined)build=next;if(next===build)return false;location.reload();return true;}

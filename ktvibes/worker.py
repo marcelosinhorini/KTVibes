@@ -42,6 +42,17 @@ def save_meta(folder: Path, meta: dict):
     temporary.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     temporary.replace(folder / "meta.json")
 
+def lyrics_status(folder: Path, meta: dict) -> str:
+    """Known availability for this identity; older or failed lookups remain unknown."""
+    if meta.get("lyrics_identity") != [meta.get("artist"), meta.get("title")]:
+        return "unknown"
+    try:
+        if lyrics.parse_lrc((folder / "lyrics.lrc").read_text(encoding="utf-8")):
+            return "available"
+    except OSError:
+        pass
+    return "missing" if meta.get("lyrics_checked") else "unknown"
+
 def fetch_video(video_id, folder, progress):
     """Runs alongside the audio work; a missing video only means the stage background."""
     try:
@@ -158,6 +169,7 @@ async def run(state, cache: Path):
             item["status"], item["step"], item["progress"] = "syncing", None, None
             await state.broadcast()
             identity = [item["artist"], item["title"]]
+            item.pop("lyrics_warning", None)
             cached = (folder / "lyrics.lrc").read_text(encoding="utf-8") if (folder / "lyrics.lrc").is_file() else ""
             raw = ""
             same = meta.get("lyrics_identity") == identity
@@ -186,6 +198,7 @@ async def run(state, cache: Path):
                     lyrics.line_starts(item["lyrics"])  # cheap, so kept out of the timing cache
                 except Exception:
                     log.exception("Word timing unavailable for %s", item["id"])
+            item["lyrics_status"] = "unknown" if item.get("lyrics_warning") else ("available" if item["lyrics"] else "missing")
             item["offset"] = float(meta.get("lyric_offset") or 0)
             meta.update(duration=item["duration"], artist=item["artist"], title=item["title"])
             item["number"] = songbook.assign(cache, meta)
