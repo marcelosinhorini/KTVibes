@@ -20,6 +20,13 @@ p{margin:0}a{color:var(--ink);text-decoration:none}
 .connection{font-size:12px;color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:7px}
 .connection::before{content:'';width:8px;height:8px;border-radius:50%;background:#bd8172}
 .connection.online::before{background:var(--lime);animation:ping 2.4s infinite}.connection.online.warn::before{background:var(--amber);animation:none}
+/* A separate local library keeps filtering independent of online search. */
+.library-open{margin:18px 0 4px;padding:10px 16px;border:1px solid var(--line);border-radius:20px;background:var(--panel2);color:var(--ink);font-weight:700}
+.library{width:min(560px,100%);max-width:none;max-height:90dvh;border:1px solid var(--line);border-radius:20px;background:var(--bg);color:var(--ink);padding:20px;overflow:auto}
+.library::backdrop{background:#000b}.library-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.library-head small{color:var(--muted)}
+.library-head button{padding:10px;font-size:20px}.library-tools{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}.library-tools input,.library-tools select{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);padding:10px;font:inherit}.library-tools input{flex:1;min-width:180px}.library-tools label{display:flex;align-items:center;gap:6px;color:var(--muted)}
+.library-message{color:var(--muted);margin:20px 0}.library #library-search{margin:18px 0 4px;padding:10px 16px;border-radius:20px;background:var(--lime);color:var(--on-lime);font-weight:700}
+body[data-theme=classic] .library-open{background:#fff;color:#1d1b16;border-color:#d9cfb4}
 @keyframes ping{0%{box-shadow:0 0 0 0 #d7fc7088}70%{box-shadow:0 0 0 8px #d7fc7000}}
 
 /* Search: stays in reach while scrolling; the ring hides content passing behind it. */

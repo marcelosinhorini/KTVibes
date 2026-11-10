@@ -21,7 +21,7 @@ function render(next){
  $('connection').textContent=!state.player_connected?'Open /tv on a device':state.player_audio?'Device ready':'Tap Enable sound on the device';$('connection').classList.toggle('warn',!state.player_audio);$('connection').classList.toggle('off',!state.player_connected);
  document.body.dataset.theme=state.theme||'default';showNow(!before);showControls(before);showQueue(before);showClassic();classicUi?.render(state);
  const ready=[state.current,...state.upcoming].filter(i=>i?.status==='ready').map(i=>i.key).join();
- if(ready!==readyKeys){readyKeys=ready;loadRecent();classicUi?.loadBook();}
+ if(ready!==readyKeys){readyKeys=ready;loadRecent();classicUi?.loadBook();if($('library').open)loadLibrary();}
 }
 // Now playing: a card at the top, handing over to the dock once scrolled away.
 function showNow(first){
@@ -291,6 +291,27 @@ async function loadRecent(){
   if(!songs.length)$('recent').append(emptyNote('♪','아직 부른 노래가 없어요','Nothing sung yet.'));
  }catch{}
 }
+// The library is independent of YouTube and includes songs that have never been played.
+let librarySongs=[],libraryRun=0;
+async function loadLibrary(){
+ const run=++libraryRun;
+ try{const songs=await api('/api/library');if(run!==libraryRun)return;librarySongs=songs;showLibrary();}
+ catch(error){if(run!==libraryRun)return;$('library-list').replaceChildren();$('library-message').hidden=false;$('library-message').textContent=`Couldn't load the library: ${error.message}`;}
+}
+function showLibrary(){
+ const q=$('library-query').value.trim().toLocaleLowerCase(),sort=$('library-sort').value;
+ const songs=librarySongs.filter(s=>`${s.title} ${s.artist} ${s.number??''}`.toLocaleLowerCase().includes(q));
+ songs.sort((a,b)=>sort==='added'?(b.prepared-a.prepared||a.title.localeCompare(b.title)):sort==='artist'?(a.artist.localeCompare(b.artist)||a.title.localeCompare(b.title)):a.title.localeCompare(b.title));
+ $('library-count').textContent=`${librarySongs.length} prepared ${librarySongs.length===1?'song':'songs'}`;
+ $('library-list').replaceChildren();
+ songs.forEach(song=>showResult({...song,channel:song.artist,parsed:{artist:song.artist,title:song.title}},$('library-list'),row=>swipeable(row,song)));
+ $('library-message').hidden=!!songs.length;$('library-message').textContent=librarySongs.length?'No matching songs. Try another title or artist.':'Your library is empty. Search YouTube and prepare a song to add it.';
+}
+$('library-open').onclick=()=>{$('library').append($('toast'));$('library').showModal();loadLibrary();};
+$('library').addEventListener('close',()=>document.body.append($('toast')));
+$('library-close').onclick=()=>$('library').close();
+$('library-query').oninput=showLibrary;$('library-sort').onchange=showLibrary;
+$('library-search').onclick=()=>{const q=$('library-query').value.trim();$('library').close();if(document.body.dataset.theme==='classic')classicUi.setTab('book');$('query').value=q;$('clear').hidden=!q;if(q)$('search-form').requestSubmit();else $('query').focus();};
 // Search in pages of 10; "More results" appends the next page.
 let search={query:'',page:0,seen:new Set()},searchRun=0;
 const enqueue=song=>api('/api/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:song.id,artist:song.artist,title:song.title})});
@@ -345,7 +366,7 @@ async function pickLyrics(song){
  const form=el('form',undefined,'lyric-search'),input=el('input'),go=el('button','Search');
  input.type='search';input.value=`${song.artist} ${song.title}`;input.placeholder='Artist and song title';input.setAttribute('aria-label','Search lyrics');go.type='submit';
  form.append(input,go);form.onsubmit=e=>{e.preventDefault();input.blur();show(input.value.trim());};
- panel.append(head,form,list);sheet.append(panel);document.body.append(sheet);
+ panel.append(head,form,list);sheet.append(panel);($('library').open?$('library'):document.body).append(sheet);
  let latest=0;  // a slow earlier lookup must not replace newer results
  async function show(query){
   const mine=++latest;
@@ -412,14 +433,15 @@ function swipeable(row,song){
   else{wrap.classList.remove('open');row.style.transform='';if(openSwipe===wrap)openSwipe=null;}
  };
  row.addEventListener('pointerup',end);row.addEventListener('pointercancel',end);
- del.onclick=async()=>{
-  del.disabled=true;
+  del.onclick=async()=>{
+   if(!confirm(`Delete the prepared download for “${song.title}”? It will need to be prepared again.`))return;
+   del.disabled=true;
   try{
    await api(`/api/songs/${song.id}`,{method:'DELETE'});
    if(openSwipe===wrap)openSwipe=null;
    if(!REDUCED.matches)await wrap.animate([{height:`${wrap.offsetHeight}px`,opacity:1},{height:'0px',opacity:0,marginBottom:'-8px'}],{duration:300,easing:'cubic-bezier(.3,0,.8,.15)'}).finished;
-   wrap.remove();recentShape=null;toast(`Deleted ${song.title}`);
-   if(!$('recent').children.length)loadRecent();
+    wrap.remove();recentShape=null;toast(`Deleted ${song.title}`);
+    loadRecent();classicUi?.loadBook();if($('library').open)loadLibrary();
   }catch(error){toast(error.message,undefined,'err');closeSwipe();}finally{del.disabled=false;}
  };
  return wrap;
