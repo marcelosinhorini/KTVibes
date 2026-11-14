@@ -267,6 +267,14 @@ class QueueTests(unittest.IsolatedAsyncioTestCase):
         state.disconnect(tv)
         self.assertFalse(state.audio)
 
+    async def test_video_is_hidden_by_default(self):
+        state = State()
+        self.assertEqual(state.snapshot()['video_mode'], 'hide')
+        await state.control({'action': 'video_mode', 'value': 'show'})
+        self.assertEqual(state.video_mode, 'show')
+        await state.control({'action': 'video_mode', 'value': 'blur'})
+        self.assertEqual(state.video_mode, 'blur')
+
     async def test_lyric_offset_is_remembered_per_song(self):
         import json
         import tempfile

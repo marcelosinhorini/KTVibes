@@ -42,7 +42,7 @@ class State:
         self.music = 1.0  # instrumental (backing track) volume
         self.guide = "latin"  # off | latin | hangul, shown above the lyrics
         self.lyric_scale = 1.5
-        self.video_mode = "show"  # show | blur | hide: blur suits lyric videos, whose own lyrics clash
+        self.video_mode = "hide"  # show | blur | hide: blur suits lyric videos, whose own lyrics clash
         self.lyric_mode = "two"  # two (classic two-line KTV) | scroll | off
         self.theme = "default"  # default | classic (Korean noraebang look, with a room timer)
         self.room_ends = None  # unix time a Classic room's singing time runs out
