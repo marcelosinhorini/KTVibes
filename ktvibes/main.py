@@ -183,19 +183,25 @@ async def choose_lyrics(video_id: str, choice: LyricChoice):
         raise HTTPException(502, f"Lyrics lookup failed: {exc}") from exc
     if not chosen or not lyrics.STAMP.search(chosen.get("syncedLyrics") or ""):
         raise HTTPException(404, "That lyrics version is no longer available")
+    raw = chosen["syncedLyrics"]
+    old_raw = (folder / "lyrics.lrc").read_text(encoding="utf-8") if (folder / "lyrics.lrc").is_file() else ""
+    if old_raw and "lyric_offset" in meta:
+        meta.setdefault("lyric_offsets", {}).setdefault(worker.lyric_key(old_raw), meta["lyric_offset"])
+    meta.pop("lyric_offset", None)
+    offset = worker.lyric_offset(meta, raw)
     if state.current and state.current["id"] == video_id:
         # The song on stage switches right away: time the new lines, then resend lyrics to the TV.
         lines = lyrics.parse_lrc(chosen["syncedLyrics"])
         lines = await asyncio.to_thread(worker.timed_lyrics, folder, chosen["syncedLyrics"], stems.path(folder, "vocals"), lines)
         lyrics.line_starts(lines)
         if state.current and state.current["id"] == video_id:
-            state.current.update(lyrics=lines, lyrics_status="available", lyrics_rev=state.current.get("lyrics_rev", 0) + 1)
-            state.offset = 0
+            state.current.update(lyrics=lines, lyrics_status="available", lyrics_rev=state.current.get("lyrics_rev", 0) + 1, offset=offset)
+            state.offset = offset
             state.lyrics_sent.clear()
             await state.broadcast()
     (folder / "lyrics.lrc").write_text(chosen["syncedLyrics"], encoding="utf-8")
     meta["lyrics_identity"] = [meta["artist"], meta["title"]]
-    meta.pop("lyric_offset", None)  # a nudge for other lyrics no longer fits
+    meta["lyric_offset"] = offset
     worker.save_meta(folder, meta)
     for item in state.upcoming:
         if item["id"] == video_id and item["status"] == "ready":
@@ -204,6 +210,7 @@ async def choose_lyrics(video_id: str, choice: LyricChoice):
             lyrics.line_starts(lines)
             item["lyrics"] = lines
             item["lyrics_status"] = "available"
+            item["offset"] = offset
     state.lyrics_catalog_rev += 1
     await state.broadcast()
     return {"saved": choice.id}
