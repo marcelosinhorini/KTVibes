@@ -1,5 +1,6 @@
 """All state mutations run on the event loop; queue entries have unique identities."""
 import asyncio
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -193,6 +194,10 @@ class State:
         try:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             meta["lyric_offset"] = self.offset
+            lyric_path = meta_path.parent / "lyrics.lrc"
+            if lyric_path.is_file():
+                key = hashlib.sha256(lyric_path.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
+                meta.setdefault("lyric_offsets", {})[key] = self.offset
             temporary = meta_path.with_suffix(".tmp")
             temporary.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
             temporary.replace(meta_path)

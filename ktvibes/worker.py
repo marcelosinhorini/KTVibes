@@ -13,6 +13,14 @@ TIMING_VERSION = 10  # bump when alignment or guide output changes, so cached ti
 LYRICS_RECHECK = 7 * 86400  # a song LRCLIB had no lyrics for is looked up again after this long
 STARTED = time.time()  # energy-only timing (aligner failed) cached before this run is retried once
 
+def lyric_key(raw: str) -> str:
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+def lyric_offset(meta: dict, raw: str) -> float:
+    """Look up this version's nudge, including offsets saved before versions were tracked."""
+    offsets = meta.get("lyric_offsets") or {}
+    return float(offsets.get(lyric_key(raw), meta.get("lyric_offset", 0)) or 0)
+
 def separate(source, destination):
     # Keep model imports off the server startup path.
     from .separate import separate as separate_audio
@@ -184,7 +192,7 @@ async def run(state, cache: Path):
                     raw, item["lyrics"] = result["raw"], result["lines"]
                     # A miss is remembered for a week, so a later LRCLIB addition is still picked up.
                     meta["lyrics_identity"], meta["lyrics_checked"] = identity, time.time()
-                    meta.pop("lyric_offset", None)  # a nudge for other lyrics no longer fits
+                    meta.pop("lyric_offset", None)  # legacy offset belonged to the previous lyrics
                     if result["raw"]:
                         (folder / "lyrics.lrc").write_text(result["raw"], encoding="utf-8")
                     else:
@@ -199,7 +207,7 @@ async def run(state, cache: Path):
                 except Exception:
                     log.exception("Word timing unavailable for %s", item["id"])
             item["lyrics_status"] = "unknown" if item.get("lyrics_warning") else ("available" if item["lyrics"] else "missing")
-            item["offset"] = float(meta.get("lyric_offset") or 0)
+            item["offset"] = lyric_offset(meta, raw) if raw else 0
             meta.update(duration=item["duration"], artist=item["artist"], title=item["title"])
             item["number"] = songbook.assign(cache, meta)
             save_meta(folder, meta)

@@ -68,6 +68,31 @@ class APITests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/library').json()[0]['lyrics_status'], 'available')
         self.assertEqual(self.main.state.lyrics_catalog_rev, 1)
 
+    def test_lyric_offsets_follow_selected_version(self):
+        import json
+        folder = Path(self.temp.name) / 'aaaaaaaaaaa'
+        folder.mkdir()
+        first, second = '[00:10.00]First', '[00:12.00]Second'
+        (folder / 'lyrics.lrc').write_text(first, encoding='utf-8')
+        (folder / 'meta.json').write_text(json.dumps({'artist': 'A', 'title': 'Song', 'duration': 100, 'lyric_offset': 1}), encoding='utf-8')
+        state = self.main.state
+        state.current = state.entry('aaaaaaaaaaa', 'A', 'Song')
+        state.current.update(status='ready', duration=100, offset=1)
+        state.offset = 1
+        async def record(record_id):
+            return {'syncedLyrics': first if record_id == 1 else second}
+        with patch.object(self.main.lyrics, 'record', record), patch.object(self.main.worker, 'timed_lyrics', side_effect=lambda folder, raw, path, lines: lines):
+            self.assertEqual(self.client.post('/api/songs/aaaaaaaaaaa/lyrics', json={'id': 2}).status_code, 200)
+            self.assertEqual(state.offset, 0)
+            asyncio.run(state.control({'action': 'offset', 'delta': -0.5}))
+            self.assertEqual(self.client.post('/api/songs/aaaaaaaaaaa/lyrics', json={'id': 1}).status_code, 200)
+            self.assertEqual(state.offset, 1)
+            self.assertEqual(self.client.post('/api/songs/aaaaaaaaaaa/lyrics', json={'id': 2}).status_code, 200)
+            self.assertEqual(state.offset, -0.5)
+        meta = json.loads((folder / 'meta.json').read_text(encoding='utf-8'))
+        self.assertEqual(self.main.worker.lyric_offset(meta, second), -0.5)
+        self.assertEqual(self.main.worker.lyric_offset(meta, first), 1)
+
     def test_recent_lists_played_songs_newest_first(self):
         import json
         cache = Path(self.temp.name)
