@@ -1,6 +1,6 @@
 // Classic theme on the remote: the room's handset and songbook, in four tabs.
 // The tabs reuse the remote's own sections (search, queue, settings); CSS shows the active tab's.
-import {$,el,api,clock,newSongs,lyricsBadge} from './shared.js';
+import {$,el,api,clock,newSongs,GUIDE_BADGES,lyricsBadge} from './shared.js';
 const TABS=['handset','book','queue','settings'],TAB_KEY='ktvibes.tab';
 const MODES={handset:'곡번호 · DIAL',book:'노래책 · SONGBOOK',queue:'예약 · RESERVED',settings:'방 설정 · ROOM'};
 // In DSEG "!" is a blank digit, so lit digits line up over the ghost 88888.
@@ -15,7 +15,7 @@ const TOASTS=[
  [/^Lyrics for (.+) set to (.+)$/,'가사','grn',(t,v)=>['Lyrics for ',el('b',t),` set to ${v}`],''],
  [/^Sent (\S+)(.*) to the device$/,null,'emo',null,''],
  [/^(\d+) 우선예약$/,'우선','org',n=>[lcdSpan(n),' 우선예약'],'Plays next'],
- [/^(.+) 우선예약$/,'우선','org',t=>[el('b',t),' 우선예약'],'Plays next'],
+ [/^(.+) (?:우선예약|plays next)$/,'우선','org',t=>[el('b',t),' 우선예약'],'Plays next'],
  [/^(\d+) 예약(?: · (.+))?$/,'예약','',(n,t)=>[lcdSpan(n),' 예약',...(t?[' · ',el('b',t)]:[])],''],
  [/^번호를 먼저/,'번호','amb',()=>['번호를 먼저 누르세요'],'Dial a number first'],
  [/^Reconnecting\. Please try again\.$/,'오류','err',()=>['Reconnecting. Please try again.'],'연결 중이에요 · 잠시 후 다시 눌러 주세요'],
@@ -40,8 +40,8 @@ export function classicRemote({send,toast,haptic,swipeable}){
   syncSheet();scrollTo(0,0);showLcd();placeIndex?.();
  }
  for(const b of document.querySelectorAll('#tabs [data-tab]'))b.onclick=()=>{haptic(6);setTab(b.dataset.tab);};
- // In Classic the settings sheet is the 설정 tab's page; outside Classic it is the usual sheet.
- function syncSheet(){if(classic()){document.body.classList.remove('sheet-open');$('sheet').inert=tab()!=='settings';}else $('sheet').inert=!document.body.classList.contains('sheet-open');}
+ // In Classic settings is a tab; in Default it can be an open sheet or a permanently visible column.
+ function syncSheet(){if(classic()){document.body.classList.remove('sheet-open');$('sheet').inert=tab()!=='settings';}else $('sheet').inert=!document.body.matches('.sheet-open,.sheet-inline');}
  function showLcd(){
   if(!state)return;const c=state.current,left=secondsLeft(state),lost=$('connection').classList.contains('lost');
   // While the socket is down the typed digits stay, the room numbers go blank and the song line says it's reconnecting.
@@ -76,7 +76,9 @@ export function classicRemote({send,toast,haptic,swipeable}){
  $('hs-guide').onclick=()=>{haptic(6);send({action:'guide',value:'cycle'});};
  for(const b of document.querySelectorAll('[data-mix]'))b.onclick=()=>{const action=b.dataset.mix,value=Math.round(Math.max(0,Math.min(1,(state?.[action]??0)+Number(b.dataset.step)))*10)/10;haptic(6);send({action,value});};
  const meter=(node,value)=>node.replaceChildren(...Array.from({length:5},(_,i)=>el('i',undefined,i<Math.round((value??0)*5)?'on':'')));
- function showHandset(){if(!state)return;const c=!!state.current;$('hs-play').disabled=$('hs-skip').disabled=!c;$('hs-play').classList.toggle('paused',!state.playing);$('hs-play').querySelector('span').textContent=state.playing?'일시정지':'재생';meter($('hs-music'),state.music);meter($('hs-vocal'),state.vocal);}
+ // The 가이드 key shows the guide it has cycled to, as the Settings switch labels it.
+ function showHandset(){if(!state)return;const c=!!state.current;$('hs-play').disabled=$('hs-skip').disabled=!c;$('hs-play').classList.toggle('paused',!state.playing);$('hs-play').querySelector('span').textContent=state.playing?'일시정지':'재생';
+  const [badge,label]=GUIDE_BADGES[state.guide]||GUIDE_BADGES.latin;$('hs-guide').querySelector('b').textContent=badge;$('hs-guide').setAttribute('aria-label',`Pronunciation guide: ${label}. Press for the next one.`);meter($('hs-music'),state.music);meter($('hs-vocal'),state.vocal);}
  // The songbook: 신곡, the existing Recent list (최근), then every song A–Z by its title's first sound.
  let songs=[];
  const INITIALS='가가나다다라마바바사사아자자차카타파하';  // the 19 leading consonants, doubled ones folded
