@@ -11,7 +11,7 @@ from ktvibes import lyrics, worker
 
 def test_non_korean_does_not_load_pronunciation_dependencies():
     lines = [{"text": "Olá mundo", "units": [["Olá", 0, 1]]}]
-    with patch.object(lyrics, "_g2p", None), patch("builtins.__import__", side_effect=AssertionError("unexpected import")):
+    with patch("builtins.__import__", side_effect=AssertionError("unexpected import")):
         assert lyrics.add_korean_romanization(lines) is lines
 
 
@@ -32,11 +32,12 @@ def test_windows_korean_uses_installed_mecab_without_installer(monkeypatch):
     monkeypatch.setitem(sys.modules, "g2pk2", types.SimpleNamespace(G2p=FakeG2p))
     monkeypatch.setitem(sys.modules, "mecab", types.SimpleNamespace(MeCab=lambda: mecab))
     monkeypatch.setattr(nltk.data, "find", lambda _: True)
-    monkeypatch.setattr(lyrics, "_g2p", None)
+    lyrics.g2p.cache_clear()
     units = [[c, 0, 1] for c in "눈물이"]
     lyrics.add_korean_romanization([{"text": "눈물이", "units": units}])
     assert [u[3] for u in units] == ["nun", "mu", "ri"]
-    assert lyrics._g2p.mecab is mecab
+    assert lyrics.g2p().mecab is mecab
+    lyrics.g2p.cache_clear()
 
 
 def test_missing_corpus_does_not_import_g2pk_or_install(monkeypatch):
@@ -47,7 +48,7 @@ def test_missing_corpus_does_not_import_g2pk_or_install(monkeypatch):
         raise LookupError("corpus missing")
 
     monkeypatch.setattr(nltk.data, "find", missing)
-    monkeypatch.setattr(lyrics, "_g2p", None)
+    lyrics.g2p.cache_clear()
     monkeypatch.delitem(sys.modules, "g2pk2", raising=False)
     with pytest.raises(RuntimeError, match="nltk.downloader cmudict"):
         lyrics.add_korean_romanization([{"text": "눈", "units": [["눈", 0, 1]]}])
