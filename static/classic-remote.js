@@ -40,8 +40,8 @@ export function classicRemote({send,toast,haptic,swipeable}){
   syncSheet();scrollTo(0,0);showLcd();placeIndex?.();
  }
  for(const b of document.querySelectorAll('#tabs [data-tab]'))b.onclick=()=>{haptic(6);setTab(b.dataset.tab);};
- // In Classic settings is a tab; in Default it can be an open sheet or a permanently visible column.
- function syncSheet(){if(classic()){document.body.classList.remove('sheet-open');$('sheet').inert=tab()!=='settings';}else $('sheet').inert=!document.body.matches('.sheet-open,.sheet-inline');}
+ // In Classic the settings sheet is the 설정 tab's page; outside Classic it is the usual sheet.
+ function syncSheet(){if(classic()){document.body.classList.remove('sheet-open');$('sheet').inert=tab()!=='settings';}else $('sheet').inert=!document.body.matches('.sheet-open,.sheet-inline');}  // wide Default: the inline sheet is always open
  function showLcd(){
   if(!state)return;const c=state.current,left=secondsLeft(state),lost=$('connection').classList.contains('lost');
   // While the socket is down the typed digits stay, the room numbers go blank and the song line says it's reconnecting.
